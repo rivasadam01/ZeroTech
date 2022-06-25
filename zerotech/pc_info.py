@@ -1,30 +1,12 @@
+import math
 import os,sys
 from subprocess import Popen,PIPE
 import re
+from typing import Callable
 
+class NoSupportedOs(Exception):
+  ''''''
 
-sample_bit_lock="""
-BitLocker Drive Encryption: Configuration Tool version 10.0.22000
-Copyright (C) 2013 Microsoft Corporation. All rights reserved.
-
-Disk volumes that can be protected with
-BitLocker Drive Encryption:
-Volume C: [OS]
-[OS Volume]
-
-    Size:                 930.77 GB
-    BitLocker Version:    None
-    Conversion Status:    Fully Decrypted
-    Percentage Encrypted: 0.0%
-    Encryption Method:    None
-    Protection Status:    Protection Off
-    Lock Status:          Unlocked
-    Identification Field: None
-    Key Protectors:       None Found
-
-
-None
-"""
 
 def get_os():
   os_type=sys.platform.lower()
@@ -37,21 +19,47 @@ def get_os():
 
 def get_serial_number():
   if get_os() =="windows":
-    serial_number_process=Popen(['wmic','bios','get','serialnumber'],stdout=PIPE)
+    serial_number_process=Popen(['wmic','bios','get','serialnumber'],stdout=PIPE,shell=True)
     serial_number,err=serial_number_process.communicate()
     return serial_number.decode().replace("\r"," ").rstrip().lstrip().split("\n")[1]
   return "Incompatible OS"
 
-def get_bitlock_info():
+def get_bitlock_info(callback:Callable=lambda b:...):
   if get_os()=="windows":
     bitlock_encrypted=Popen(['manage-bde','-status',"c:"],stdout=PIPE)
     bitlock_encrypted_info,bitlock_encrypted_error=bitlock_encrypted.communicate()
 
     status=re.findall("Protection Status:.*",bitlock_encrypted_info.decode())
     if(len(status)==0):
+      callback("NO INFO. ADMIN?")
       return "NO INFO. ADMIN?"
     if(status[0].split(':')[1].lstrip().rstrip()=="Protection On"):
+      callback("ON!")
       return "ON!"
     else:
+      callback("OFF")
       return "OFF"
+  
+  callback("Os not supported.")
   return "OS not supported."
+
+def get_bitlock_recovery_key():
+  # To be implemented
+  ...
+
+def get_user_size(callback:Callable=lambda u:...):
+  user_dir=""
+  if get_os()=="windows":
+    user_dir='c:\\Users'
+    print(user_dir)
+  else:
+    raise NoSupportedOs
+  dir_size_process=Popen(['dir','/s',user_dir],stdout=PIPE,stderr=PIPE,shell=True)
+  dir_size_output,dir_size_error=dir_size_process.communicate()
+  result=round(float(dir_size_output.decode().strip().split('Total Files Listed:')[1]\
+      .lstrip().rstrip().split('bytes')[0].split('File(s)')[1].lstrip().rstrip()\
+      .replace(',',""))/math.pow(1024,3),3)
+  
+  callback(result)
+
+  return f"{result}GB"

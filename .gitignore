@@ -2,3 +2,5 @@
 dist
 build
 run.spec
+__pycache__
+zerotech/__pycache__
